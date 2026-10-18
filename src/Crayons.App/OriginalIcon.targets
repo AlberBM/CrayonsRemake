@@ -1,0 +1,88 @@
+<Project>
+  <!--
+    Gives Crayons.App.exe the original program's icon. The icon is read at build time
+    from the user's own install (CRAYONST.EXE, icon group MAINICON) into obj\, so no
+    original artwork is stored in the repo. Without an install the exe keeps the
+    default icon. Override the location with -p:CrayonsInstall=<folder>.
+  -->
+  <PropertyGroup>
+    <CrayonsInstall Condition="'$(CrayonsInstall)' == ''">E:\Programs\XCRAYON</CrayonsInstall>
+    <_CrayonsIconSource>$(CrayonsInstall)\CRAYONST.EXE</_CrayonsIconSource>
+    <_CrayonsIconFile>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)crayons.ico</_CrayonsIconFile>
+  </PropertyGroup>
+
+  <UsingTask TaskName="ExtractNeIcon" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Source ParameterType="System.String" Required="true" />
+      <GroupName ParameterType="System.String" Required="true" />
+      <Output ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        // Walks the NE resource table, then writes the group's images as an .ico file.
+        byte[] f = File.ReadAllBytes(Source);
+        int ne = BitConverter.ToInt32(f, 0x3c);
+        if (f[ne] != 'N' || f[ne + 1] != 'E') { Log.LogError(Source + " is not an NE executable"); return false; }
+        int rt = ne + BitConverter.ToUInt16(f, ne + 0x24);
+        int shift = BitConverter.ToUInt16(f, rt);
+        var groups = new System.Collections.Generic.Dictionary<string, int[]>();
+        var icons = new System.Collections.Generic.Dictionary<int, int[]>();
+        for (int p = rt + 2; ;)
+        {
+            ushort type = BitConverter.ToUInt16(f, p);
+            if (type == 0) break;
+            int count = BitConverter.ToUInt16(f, p + 2);
+            p += 8;
+            for (int i = 0; i < count; i++, p += 12)
+            {
+                int off = BitConverter.ToUInt16(f, p) << shift, len = BitConverter.ToUInt16(f, p + 2) << shift;
+                ushort id = BitConverter.ToUInt16(f, p + 6);
+                string name = (id & 0x8000) != 0 ? (id & 0x7fff).ToString() : Encoding.ASCII.GetString(f, rt + id + 1, f[rt + id]);
+                if (type == 0x8003) icons[id & 0x7fff] = new[] { off, len };
+                if (type == 0x800e) groups[name.ToUpperInvariant()] = new[] { off, len };
+            }
+        }
+        int[] g;
+        if (!groups.TryGetValue(GroupName.ToUpperInvariant(), out g)) { Log.LogError(Source + " has no icon group " + GroupName); return false; }
+        int n = BitConverter.ToUInt16(f, g[0] + 4);
+        var images = new System.Collections.Generic.List<byte[]>();
+        for (int i = 0; i < n; i++)
+        {
+            int[] ic = icons[BitConverter.ToUInt16(f, g[0] + 6 + i * 14 + 12)];
+            var dib = new byte[Math.Min(ic[1], f.Length - ic[0])];
+            Array.Copy(f, ic[0], dib, 0, dib.Length);
+            images.Add(dib);
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(Output));
+        using (var w = new BinaryWriter(File.Create(Output)))
+        {
+            w.Write((ushort)0); w.Write((ushort)1); w.Write((ushort)n);
+            int offset = 6 + 16 * n;
+            for (int i = 0; i < n; i++)
+            {
+                w.Write(f, g[0] + 6 + i * 14, 8);   // width, height, colours, reserved, planes, bit count
+                w.Write(images[i].Length);
+                w.Write(offset);
+                offset += images[i].Length;
+            }
+            foreach (var img in images) w.Write(img);
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="UseOriginalIcon" BeforeTargets="CoreCompile" Condition="Exists('$(_CrayonsIconSource)')"
+          Inputs="$(_CrayonsIconSource)" Outputs="$(_CrayonsIconFile)">
+    <ExtractNeIcon Source="$(_CrayonsIconSource)" GroupName="MAINICON" Output="$(_CrayonsIconFile)" />
+  </Target>
+
+  <!-- Separate from the extraction so the icon is still used when that target is skipped as up to date. -->
+  <Target Name="SetOriginalIcon" AfterTargets="UseOriginalIcon" BeforeTargets="CoreCompile" Condition="Exists('$(_CrayonsIconFile)')">
+    <PropertyGroup>
+      <ApplicationIcon>$(_CrayonsIconFile)</ApplicationIcon>
+    </PropertyGroup>
+  </Target>
+</Project>
