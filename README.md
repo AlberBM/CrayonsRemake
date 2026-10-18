@@ -14,6 +14,18 @@ The remake reproduces the original's screens, tools, music and sound effects. Bo
 
 The remake looks for that folder in `\XCRAYON`, `\Programs\XCRAYON` and `\Program Files\Expert Software\Crayons` on each fixed drive. If it doesn't find one there, it asks you to pick the folder once and remembers your choice in `%LOCALAPPDATA%\CrayonsRemake\install-path.txt`. You can also pass the folder as the first argument.
 
+## Download
+
+If you don't want to build it yourself:
+
+1. Get `CrayonsStudioRemake-win-x64.zip` from the [latest release](https://github.com/AlberBM/CrayonsRemake/releases/latest).
+2. Unzip it anywhere.
+3. Run `Crayons.App.exe`.
+
+The download is self-contained, so you don't need to install .NET. On first start the program asks for your original Crayons folder if it doesn't find it on its own.
+
+Windows SmartScreen may warn about an unrecognised app because the exe isn't code-signed. Choose **More info → Run anyway**.
+
 ## Build and run
 
 ```
@@ -69,4 +81,4 @@ The remake was built clean-room from a written description of the original's beh
 
 ## Disclaimer
 
-This is an unofficial fan project for preservation and education. It is not affiliated with or endorsed by the original publisher or the owners of the Crayons Color & Paint Studio name. All trademarks belong to their respective owners. No original assets are distributed here.
+This is an unofficial fan project for preservation and education. It is not affiliated with or endorsed by the original publisher or the owners of the Crayons Color & Paint Studio name. All trademarks belong to their respective owners. No original assets are distributed in this repository. The one exception is the program icon embedded in the release download's `Crayons.App.exe`, which is the original program's icon.
